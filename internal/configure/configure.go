@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"projects/parser/internal/app/conveyer"
+	"projects/parser/internal/conveyer"
 
 	"github.com/BurntSushi/toml"
 )
