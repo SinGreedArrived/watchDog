@@ -2,28 +2,27 @@ package configure
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"projects/parser/internal/conveyer"
+	"projects/parser/internal/store"
 
 	"github.com/BurntSushi/toml"
 )
 
 type config struct {
 	Conveyer map[string]*conveyer.Config `toml:"conveyer"`
-	Targets  map[string]*targetList      `toml:"targets"`
+	Targets  map[string][]string         `toml:"targets"`
+	Store    *store.Config               `toml:"store"`
 }
 
-type targetList struct {
-	List []string
-}
-
-func New() *config {
-	return &config{}
+func NewConfig() *config {
+	return &config{
+		Store: store.NewConfig(),
+	}
 }
 
 func (self *config) LoadToml(filename string) error {
-	log.Println("Load Toml file")
+	//	log.Println("Load Toml file")
 	f, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -39,6 +38,10 @@ func (self *config) LoadToml(filename string) error {
 	return nil
 }
 
-func (self *config) GetConveyerConfig(name string) *conveyer.Config {
-	return self.Conveyer[name]
+func (self *config) GetConveyerConfig() map[string]*conveyer.Config {
+	return self.Conveyer
+}
+
+func (self *config) GetTargetList(sourceName string) []string {
+	return self.Targets[sourceName]
 }

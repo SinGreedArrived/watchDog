@@ -3,5 +3,11 @@ build:
 #		go build -v -gcflags=all="-N -l" ./cmd/parser
 	go build -v ./cmd/parser
 
-.DEFAULT_GOAL := build
+run: build
+	./parser
 
+.PHONY: test
+test:
+	go test -v -timeout 20s ./...
+
+.DEFAULT_GOAL := build
