@@ -16,7 +16,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/proxy"
 )
 
@@ -26,35 +25,37 @@ func Panic(err error) {
 	}
 }
 
-type conveyer struct {
+type Conveyer struct {
 	name        string
-	input       chan string
+	input       chan []byte
 	output      chan []byte
 	data        [][]byte
 	pointer     int
 	httpClient  *http.Client
 	httpRequest *http.Request
-	steps       []func(*conveyer) error
+	steps       []func(*Conveyer) error
 	config      *Config
-	logger      *logrus.Logger
+	//	logger      *logrus.Logger
 }
 
-func (self *conveyer) init(name string) error {
+func (self *Conveyer) init(name string) error {
 	self.name = name
 	self.pointer = 0
-	self.input = make(chan string)
+	self.input = make(chan []byte)
 	self.output = make(chan []byte)
 	self.httpClient = &http.Client{}
 	httpTransport := &http.Transport{}
 	self.httpRequest, _ = http.NewRequest("", "", nil)
-	self.steps = make([]func(*conveyer) error, 0)
+	self.steps = make([]func(*Conveyer) error, 0)
 	self.httpRequest.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0")
-	self.logger = logrus.New()
-	if level, err := logrus.ParseLevel(self.config.logLevel); err != nil {
-		self.logger.SetLevel(logrus.InfoLevel)
-	} else {
-		self.logger.SetLevel(level)
-	}
+	/*
+		self.logger = logrus.New()
+		if level, err := logrus.ParseLevel(self.config.logLevel); err != nil {
+			self.logger.SetLevel(logrus.InfoLevel)
+		} else {
+			self.logger.SetLevel(level)
+		}
+	*/
 	if self.config.Proxy != "" {
 		dialer, err := proxy.SOCKS5("tcp", self.config.Proxy, nil, proxy.Direct)
 		if err != nil {
@@ -77,8 +78,7 @@ func (self *conveyer) init(name string) error {
 		cmd := command
 		switch cmd[0] {
 		case "download":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
-				conveyer.logger.Debugf("Download(%s)", string(conveyer.GetData()))
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				elem, err := url.Parse(string(conveyer.GetData()))
 				if err != nil {
 					return err
@@ -97,40 +97,34 @@ func (self *conveyer) init(name string) error {
 					return err
 				}
 				conveyer.WriteData(body)
-				conveyer.logger.Debugf("Result Download(%s):%s", string(self.data[self.pointer-1]), string(conveyer.GetData()))
 				return nil
 			})
 		case "remove":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				reg := cmd[1]
-				conveyer.logger.Debugf("Remove(%s)", reg)
 				regxp, err := regexp.Compile(reg)
 				if err != nil {
 					return err
 				}
 				data := regxp.ReplaceAll(conveyer.data[conveyer.pointer], []byte(""))
 				conveyer.WriteData(data)
-				conveyer.logger.Debugf("Result Remove(%s):%s", reg, string(conveyer.GetData()))
 				return nil
 			})
 		case "replace":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				reg := cmd[1]
 				repl := cmd[2]
-				conveyer.logger.Debugf("Replace(%s,%s)", reg, repl)
 				regxp, err := regexp.Compile(reg)
 				if err != nil {
 					return err
 				}
 				data := regxp.ReplaceAll(conveyer.data[conveyer.pointer], []byte(repl))
 				conveyer.WriteData(data)
-				conveyer.logger.Debugf("Result Replace(%s,%s):%s", reg, repl, string(conveyer.GetData()))
 				return nil
 			})
 		case "css":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				selector := cmd[1]
-				conveyer.logger.Debugf("CSS(%s)", selector)
 				doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(conveyer.data[conveyer.pointer])))
 				if err != nil {
 					return err
@@ -141,11 +135,10 @@ func (self *conveyer) init(name string) error {
 					return err
 				}
 				conveyer.WriteData([]byte(body))
-				conveyer.logger.Debugf("Result CSS(%s):%s", selector, string(conveyer.GetData()))
 				return nil
 			})
 		case "undo":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				i, _ := strconv.Atoi(cmd[1])
 				for ; i != 0; i-- {
 					conveyer.pointer--
@@ -156,7 +149,7 @@ func (self *conveyer) init(name string) error {
 				return nil
 			})
 		case "redo":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				i, _ := strconv.Atoi(cmd[1])
 				for ; i != 0; i-- {
 					conveyer.pointer++
@@ -167,15 +160,13 @@ func (self *conveyer) init(name string) error {
 				return nil
 			})
 		case "md5":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
-				conveyer.logger.Debugf("MD5(%s)", conveyer.GetData())
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				hash := md5.Sum(conveyer.data[conveyer.pointer])
 				conveyer.WriteData([]byte(hash[:]))
-				conveyer.logger.Debugf("Result MD5(%s):%s", self.data[self.pointer-1], conveyer.GetData())
 				return nil
 			})
 		case "show":
-			self.steps = append(self.steps, func(conveyer *conveyer) error {
+			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				fmt.Println(string(conveyer.data[conveyer.pointer]))
 				return nil
 			})
@@ -184,21 +175,21 @@ func (self *conveyer) init(name string) error {
 	return nil
 }
 
-func (self *conveyer) Start(wg *sync.WaitGroup) chan string {
+func (self *Conveyer) Start(wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		for elem := range self.input {
-			self.WriteData([]byte(elem))
+			self.WriteData(elem)
 			for _, step := range self.steps {
 				err := step(self)
 				if err != nil {
-					self.logger.Panic(err)
+					Panic(err)
 				}
 			}
+			data := self.GetData()
+			self.output <- data
 			time.Sleep(time.Millisecond * time.Duration(self.config.Delay))
-			self.output <- self.GetData()
 		}
-		self.logger.Infof("Done conveyer: %s", self.name)
 		defer func() {
 			if r := recover(); r != nil {
 				wg.Add(1)
@@ -208,18 +199,16 @@ func (self *conveyer) Start(wg *sync.WaitGroup) chan string {
 			wg.Done()
 		}()
 	}()
-	self.logger.Infof("Start conveyer: %s", self.name)
-	return self.input
 }
 
-func (self *conveyer) GetData(number ...int) []byte {
+func (self *Conveyer) GetData(number ...int) []byte {
 	if len(number) > 0 {
 		return self.data[number[0]]
 	}
 	return self.data[self.pointer]
 }
 
-func (self *conveyer) WriteData(data []byte) {
+func (self *Conveyer) WriteData(data []byte) {
 	if self.pointer == len(self.data)-1 {
 		self.data = append(self.data, data)
 		self.pointer++
@@ -228,29 +217,35 @@ func (self *conveyer) WriteData(data []byte) {
 	}
 }
 
-func New(name string, cc *Config) *conveyer {
+func New(name string, cc *Config) (*Conveyer, error) {
 	if cc == nil {
 		cc = NewConfig()
 	}
-	tmp := &conveyer{
+	tmp := &Conveyer{
 		config: cc,
 	}
-	tmp.init(name)
-	return tmp
+	err := tmp.init(name)
+	if err != nil {
+		return nil, err
+	}
+	return tmp, nil
 }
 
-func (self *conveyer) GetInputChan() chan string {
-	return self.input
+func (self *Conveyer) Write(data []byte) (n int, err error) {
+	self.input <- data
+	return len(data), nil
 }
 
-func (self *conveyer) GetOutputChan() chan []byte {
-	return self.output
+func (self *Conveyer) Read() []byte {
+	return <-self.output
 }
 
-func (self *conveyer) SetLogger(logger *logrus.Logger) {
+/*
+func (self *Conveyer) SetLogger(logger *logrus.Logger) {
 	self.logger = logger
 }
+*/
 
-func (self *conveyer) Close() {
+func (self *Conveyer) Close() {
 	close(self.input)
 }

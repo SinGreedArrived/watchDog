@@ -2,9 +2,10 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"projects/parser/internal/configure"
 	"projects/parser/internal/conveyer"
+	"projects/parser/internal/model"
+	"projects/parser/internal/store"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -19,15 +20,8 @@ var (
 func init() {
 	flag.StringVar(&CONFIG_PATH, "config", "configs/config.toml", "path to config file")
 	logger = logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.InfoLevel)
 	logger.SetFormatter(&logrus.TextFormatter{})
-}
-
-type pipe interface {
-	GetInputChan() chan string
-	GetOutputChan() chan []byte
-	Start(*sync.WaitGroup) chan string
-	Close()
 }
 
 func main() {
@@ -35,22 +29,51 @@ func main() {
 	config := configure.NewConfig()
 	err := config.LoadToml(CONFIG_PATH)
 	if err != nil {
-		logger.Fatal(err)
+		logger.WithFields(logrus.Fields{
+			"package":  "configure",
+			"function": "LoadToml",
+			"argument": CONFIG_PATH,
+		}).Fatal(err)
 	}
-	conveyers := make(map[string]pipe)
+	db := store.New(config.Store)
+	if err := db.Open(); err != nil {
+		logger.WithFields(logrus.Fields{
+			"package":  "store",
+			"function": "Open",
+		}).Fatal(err)
+	}
+	defer db.Close()
+	conveyers := make(map[string]*conveyer.Conveyer)
 	for name, configConveyer := range config.GetConveyerConfig() {
-		tmp := conveyer.New(name, configConveyer)
-		conveyers[name] = tmp
+		conveyers[name], err = conveyer.New(name, configConveyer)
+		logger.WithFields(logrus.Fields{
+			"conveyer": name,
+		}).Info("Create conveyer")
+		if err != nil {
+			logger.WithFields(logrus.Fields{
+				"package":  "conveyer",
+				"function": "LoadToml",
+				"args[1]":  name,
+				"args[2]":  configConveyer,
+			}).Warn(err)
+		}
 		conveyers[name].Start(&wg)
 	}
 	list := config.GetTargetList("remanga.org")
-	for i := 0; i < 3; i++ {
-		conveyers["remanga.org"].GetInputChan() <- list[i]
-		fmt.Println(<-conveyers["remanga.org"].GetOutputChan())
-	}
+	//fmt.Fprintf(conveyers["remanga.org"], "%s", list[1])
 	for name, _ := range config.GetConveyerConfig() {
 		conveyers[name].Close()
 	}
-
+	_, err = db.Target().Create(&model.Target{
+		Url:  string(list[1]),
+		Hash: string("awesome"),
+	})
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"package":  "store",
+			"function": "Target().Create()",
+			"args":     "Url:'" + string(list[1]) + "' | Hash:'" + string("awesome") + "'",
+		}).Warn(err)
+	}
 	wg.Wait()
 }
