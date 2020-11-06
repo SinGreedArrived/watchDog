@@ -6,7 +6,7 @@ type newsRepo struct {
 	store *Store
 }
 
-func (self newsRepo) Create(n *model.News) (*model.News, error) {
+func (self *newsRepo) Create(n *model.News) (*model.News, error) {
 	if _, err := self.store.db.Exec(
 		"INSERT or REPLACE INTO news (url) values (?)",
 		n.Url,
@@ -16,10 +16,19 @@ func (self newsRepo) Create(n *model.News) (*model.News, error) {
 	return n, nil
 }
 
-func (self newsRepo) Delete(url string) error {
+func (self *newsRepo) Delete(url string) error {
 	if _, err := self.store.db.Exec(
 		"Delete from news where url=?",
 		url,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *newsRepo) DeleteAll() error {
+	if _, err := self.store.db.Exec(
+		"delete from news",
 	); err != nil {
 		return err
 	}

@@ -3,23 +3,35 @@ package main
 import (
 	"encoding/hex"
 	"flag"
+	"log"
+	"os"
+	"os/exec"
 	"projects/parser/internal/configure"
 	"projects/parser/internal/conveyer"
 	"projects/parser/internal/model"
 	"projects/parser/internal/store"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 var (
 	CONFIG_PATH string
+	BROWSER     string
+	OPEN_NEW    bool
+	CLEAR_NEW   bool
+	DELAY_OPEN  int
 	logger      *logrus.Logger
 	wg          sync.WaitGroup
 )
 
 func init() {
 	flag.StringVar(&CONFIG_PATH, "config", "configs/config.toml", "path to config file")
+	flag.StringVar(&BROWSER, "browser", "firefox", "browser for open link")
+	flag.BoolVar(&OPEN_NEW, "open", false, "browser for open link")
+	flag.BoolVar(&CLEAR_NEW, "clear", false, "clear news")
+	flag.IntVar(&DELAY_OPEN, "delay", 1500, "delay for open link")
 	logger = logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
 	logger.SetFormatter(&logrus.TextFormatter{})
@@ -38,6 +50,15 @@ func Collector(s *store.Store, collectChan chan *model.Target) {
 			} else {
 				continue
 			}
+		}
+	}
+}
+
+func OpenLink(url string) {
+	cmd := exec.Command(BROWSER, url)
+	if err := cmd.Start(); err != nil {
+		if err != nil {
+			log.Println(err)
 		}
 	}
 }
@@ -61,6 +82,22 @@ func main() {
 		}).Fatal(err)
 	}
 	defer db.Close()
+	if OPEN_NEW {
+		urls, _ := db.News().GetAll()
+		if len(urls) == 0 {
+			logger.Info("I don't have news")
+		}
+		for _, url := range urls {
+			OpenLink(url.Url)
+			time.Sleep(time.Millisecond * time.Duration(DELAY_OPEN))
+		}
+		os.Exit(0)
+	}
+	if CLEAR_NEW {
+		db.News().DeleteAll()
+		logger.Info("Clear all news")
+		os.Exit(0)
+	}
 	collectChan := make(chan *model.Target)
 	conveyers := make(map[string]*conveyer.Conveyer)
 	for name, configConveyer := range config.GetConveyerConfig() {
