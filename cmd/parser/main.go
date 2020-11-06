@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,7 +35,11 @@ func init() {
 	flag.IntVar(&DELAY_OPEN, "delay", 1500, "delay for open link")
 	logger = logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
-	logger.SetFormatter(&logrus.TextFormatter{})
+	logger.SetFormatter(&nested.Formatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		FieldsOrder:     []string{"component", "name"},
+		HideKeys:        true,
+	})
 }
 
 func Collector(s *store.Store, collectChan chan *model.Target) {
@@ -68,6 +73,7 @@ func main() {
 	config := configure.NewConfig()
 	err := config.LoadToml(CONFIG_PATH)
 	if err != nil {
+		logger.SetFormatter(&logrus.TextFormatter{})
 		logger.WithFields(logrus.Fields{
 			"package":  "configure",
 			"function": "LoadToml",
@@ -76,6 +82,7 @@ func main() {
 	}
 	db := store.New(config.Store)
 	if err := db.Open(); err != nil {
+		logger.SetFormatter(&logrus.TextFormatter{})
 		logger.WithFields(logrus.Fields{
 			"package":  "store",
 			"function": "Open",
@@ -103,7 +110,7 @@ func main() {
 	for name, configConveyer := range config.GetConveyerConfig() {
 		conveyers[name], err = conveyer.New(name, configConveyer)
 		logger.WithFields(logrus.Fields{
-			"conveyer": name,
+			"component": "conveyer:" + name,
 		}).Info("Create conveyer")
 		if err != nil {
 			logger.WithFields(logrus.Fields{
@@ -140,4 +147,6 @@ func main() {
 		}(conv, TargetList)
 	}
 	wg.Wait()
+	elems, err := db.News().GetAll()
+	logger.Infof("Status news: %d", len(elems))
 }

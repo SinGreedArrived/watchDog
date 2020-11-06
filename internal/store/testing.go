@@ -8,8 +8,8 @@ import (
 func TestStore(t *testing.T, db_type string, db_path string) (*Store, func(...string)) {
 	t.Helper()
 	config := NewConfig()
-	config.db_type = "sqlite3"
-	config.path = "database_test"
+	config.DBtype = "sqlite3"
+	config.DBpath = "database_test"
 	s := New(config)
 	if err := s.Open(); err != nil {
 		t.Fatal(err)

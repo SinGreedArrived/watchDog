@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS "news" (
 	PRIMARY KEY("url")
 );`
 
-	self.db, _ = sql.Open(self.config.db_type, self.config.path)
+	self.db, _ = sql.Open(self.config.DBtype, self.config.DBpath)
 	if self.db == nil {
 		panic("db nil")
 	}

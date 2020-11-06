@@ -3,6 +3,9 @@ build:
 #		go build -v -gcflags=all="-N -l" ./cmd/parser
 	go build -v ./cmd/parser
 
+windows:
+	GOOS=windows go build -v ./cmd/parser
+
 run: build
 	./parser
 
