@@ -125,11 +125,15 @@ func (self *Conveyer) init(name string) error {
 		case "css":
 			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				selector := cmd[1]
+				number, err := strconv.Atoi(cmd[2])
+				if err != nil {
+					number = 0
+				}
 				doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(conveyer.data[conveyer.pointer])))
 				if err != nil {
 					return err
 				}
-				slc := doc.Find(selector)
+				slc := doc.Find(selector).Eq(number)
 				body, err := goquery.OuterHtml(slc)
 				if err != nil {
 					return err
@@ -170,6 +174,8 @@ func (self *Conveyer) init(name string) error {
 				fmt.Println(string(conveyer.data[conveyer.pointer]))
 				return nil
 			})
+		default:
+			return errors.New(fmt.Sprintf("Command %s unknown", cmd[0]))
 		}
 	}
 	return nil

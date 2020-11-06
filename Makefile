@@ -4,7 +4,7 @@ build:
 	go build -v ./cmd/parser
 
 windows:
-	GOOS=windows go build -v ./cmd/parser
+	CGO_ENABLED=1 GOOS=windows GOARCH=386 go build -v -o parser_cgo1.exe ./cmd/parser 
 
 run: build
 	./parser

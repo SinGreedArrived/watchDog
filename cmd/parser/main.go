@@ -69,30 +69,31 @@ func OpenLink(url string) {
 }
 
 func main() {
+	logger.Info("Start factory...")
 	flag.Parse()
 	config := configure.NewConfig()
 	err := config.LoadToml(CONFIG_PATH)
 	if err != nil {
-		logger.SetFormatter(&logrus.TextFormatter{})
 		logger.WithFields(logrus.Fields{
 			"package":  "configure",
 			"function": "LoadToml",
 			"argument": CONFIG_PATH,
 		}).Fatal(err)
 	}
+	logger.WithField("component", "config").Info("Loaded configure from " + CONFIG_PATH)
 	db := store.New(config.Store)
 	if err := db.Open(); err != nil {
-		logger.SetFormatter(&logrus.TextFormatter{})
 		logger.WithFields(logrus.Fields{
 			"package":  "store",
 			"function": "Open",
 		}).Fatal(err)
 	}
 	defer db.Close()
+	logger.WithField("component", "store").Info("Opened store from " + config.Store.DBpath)
 	if OPEN_NEW {
 		urls, _ := db.News().GetAll()
 		if len(urls) == 0 {
-			logger.Info("I don't have news")
+			logger.WithField("component", "store").Info("I don't have news")
 		}
 		for _, url := range urls {
 			OpenLink(url.Url)
@@ -102,7 +103,7 @@ func main() {
 	}
 	if CLEAR_NEW {
 		db.News().DeleteAll()
-		logger.Info("Clear all news")
+		logger.WithField("component", "store").Info("Clear all news")
 		os.Exit(0)
 	}
 	collectChan := make(chan *model.Target)
@@ -125,15 +126,21 @@ func main() {
 	go Collector(db, collectChan)
 	for name, conv := range conveyers {
 		TargetList := config.GetTargetList(name)
-		logger.Infof("Get %d elem for %s", len(TargetList), name)
 		go func(conv *conveyer.Conveyer, list []string) {
 			count := 0
+			logger.WithFields(logrus.Fields{
+				"component": "conveyer:" + conv.GetName(),
+				"status":    "Received",
+			}).Infof("%d links", len(TargetList))
 			for _, url := range list {
 				conv.GetInput() <- []byte(url)
 				count++
 			}
 			conv.Close()
-			logger.Infof("Conveyer %s done: %d", conv.GetName(), count)
+			logger.WithFields(logrus.Fields{
+				"component": "conveyer:" + conv.GetName(),
+				"status":    "Done",
+			}).Infof("%d links", count)
 		}(conv, TargetList)
 		go func(conv *conveyer.Conveyer, list []string) {
 			for _, url := range list {
@@ -148,5 +155,8 @@ func main() {
 	}
 	wg.Wait()
 	elems, err := db.News().GetAll()
-	logger.Infof("Status news: %d", len(elems))
+	logger.WithField("component", "store").Infof("News:\n")
+	for _, v := range elems {
+		logger.WithField("component", "store").Infof("%s:\n", v.Url)
+	}
 }
