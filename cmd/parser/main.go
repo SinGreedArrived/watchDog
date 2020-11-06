@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"projects/parser/internal/configure"
 	"projects/parser/internal/conveyer"
@@ -24,6 +25,23 @@ func init() {
 	logger.SetFormatter(&logrus.TextFormatter{})
 }
 
+func Collector(s *store.Store, collectChan chan *model.Target) {
+	for t := range collectChan {
+		elem, _ := s.Target().FindByUrl(t.Url)
+		if elem == nil {
+			s.Target().Create(t)
+			s.News().Create(&model.News{Url: t.Url})
+		} else {
+			if elem.Hash != t.Hash {
+				s.Target().Create(t)
+				s.News().Create(&model.News{Url: t.Url})
+			} else {
+				continue
+			}
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	config := configure.NewConfig()
@@ -43,6 +61,7 @@ func main() {
 		}).Fatal(err)
 	}
 	defer db.Close()
+	collectChan := make(chan *model.Target)
 	conveyers := make(map[string]*conveyer.Conveyer)
 	for name, configConveyer := range config.GetConveyerConfig() {
 		conveyers[name], err = conveyer.New(name, configConveyer)
@@ -59,21 +78,29 @@ func main() {
 		}
 		conveyers[name].Start(&wg)
 	}
-	list := config.GetTargetList("remanga.org")
-	//fmt.Fprintf(conveyers["remanga.org"], "%s", list[1])
-	for name, _ := range config.GetConveyerConfig() {
-		conveyers[name].Close()
-	}
-	_, err = db.Target().Create(&model.Target{
-		Url:  string(list[1]),
-		Hash: string("awesome"),
-	})
-	if err != nil {
-		logger.WithFields(logrus.Fields{
-			"package":  "store",
-			"function": "Target().Create()",
-			"args":     "Url:'" + string(list[1]) + "' | Hash:'" + string("awesome") + "'",
-		}).Warn(err)
+	go Collector(db, collectChan)
+	for name, conv := range conveyers {
+		TargetList := config.GetTargetList(name)
+		logger.Infof("Get %d elem for %s", len(TargetList), name)
+		go func(conv *conveyer.Conveyer, list []string) {
+			count := 0
+			for _, url := range list {
+				conv.GetInput() <- []byte(url)
+				count++
+			}
+			conv.Close()
+			logger.Infof("Conveyer %s done: %d", conv.GetName(), count)
+		}(conv, TargetList)
+		go func(conv *conveyer.Conveyer, list []string) {
+			for _, url := range list {
+				hash := <-conv.GetOutput()
+				strHash := hex.EncodeToString(hash)
+				collectChan <- &model.Target{
+					Url:  url,
+					Hash: strHash,
+				}
+			}
+		}(conv, TargetList)
 	}
 	wg.Wait()
 }

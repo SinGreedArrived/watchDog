@@ -24,7 +24,8 @@ func (self *targetRepo) Create(t *model.Target) (*model.Target, error) {
 func (self *targetRepo) FindByUrl(url string) (*model.Target, error) {
 	t := &model.Target{}
 	if err := self.store.db.QueryRow(
-		"SELECT url, hash FROM targets",
+		"SELECT url, hash FROM targets where url=?",
+		url,
 	).Scan(
 		&t.Url,
 		&t.Hash,

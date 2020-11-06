@@ -10,6 +10,7 @@ type Store struct {
 	db         *sql.DB
 	config     *Config
 	TargetRepo *targetRepo
+	NewsRepo   *newsRepo
 }
 
 // new Store ...
@@ -57,4 +58,14 @@ func (self *Store) Target() *targetRepo {
 		store: self,
 	}
 	return self.TargetRepo
+}
+
+func (self *Store) News() *newsRepo {
+	if self.NewsRepo != nil {
+		return self.NewsRepo
+	}
+	self.NewsRepo = &newsRepo{
+		store: self,
+	}
+	return self.NewsRepo
 }
