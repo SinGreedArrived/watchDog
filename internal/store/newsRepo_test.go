@@ -24,7 +24,7 @@ func TestNews_Create(t *testing.T) {
 	assert.NotNil(t, new)
 }
 
-func TestNews_Delete(t *testing.T) {
+func TestNews_DeleteByUrl(t *testing.T) {
 	s, tearDown := store.TestStore(t, "", "")
 	defer tearDown("news")
 
@@ -33,7 +33,7 @@ func TestNews_Delete(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, new)
-	err = s.News().Delete("testUrl")
+	err = s.News().DeleteByUrl("testUrl")
 	assert.NoError(t, err)
 }
 

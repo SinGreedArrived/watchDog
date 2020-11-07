@@ -125,9 +125,9 @@ func (self *Conveyer) init(name string) error {
 		case "css":
 			self.steps = append(self.steps, func(conveyer *Conveyer) error {
 				selector := cmd[1]
-				number, err := strconv.Atoi(cmd[2])
-				if err != nil {
-					number = 0
+				number := 0
+				if len(cmd) > 2 {
+					number, _ = strconv.Atoi(cmd[2])
 				}
 				doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(conveyer.data[conveyer.pointer])))
 				if err != nil {
@@ -233,6 +233,9 @@ func New(name string, cc *Config) (*Conveyer, error) {
 		config: cc,
 	}
 	err := tmp.init(name)
+	if rerr := recover(); rerr != nil {
+		return nil, errors.New(rerr.(string))
+	}
 	if err != nil {
 		return nil, err
 	}

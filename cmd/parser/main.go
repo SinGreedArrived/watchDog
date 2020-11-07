@@ -47,11 +47,11 @@ func Collector(s *store.Store, collectChan chan *model.Target) {
 		elem, _ := s.Target().FindByUrl(t.Url)
 		if elem == nil {
 			s.Target().Create(t)
-			s.News().Create(&model.News{Url: t.Url})
+			s.News().Create(&model.News{Url: t.Url, Open: false})
 		} else {
 			if elem.Hash != t.Hash {
 				s.Target().Create(t)
-				s.News().Create(&model.News{Url: t.Url})
+				s.News().Create(&model.News{Url: t.Url, Open: false})
 			} else {
 				continue
 			}
@@ -97,31 +97,30 @@ func main() {
 		}
 		for _, url := range urls {
 			OpenLink(url.Url)
+			db.News().CheckOpened(url.Url)
 			time.Sleep(time.Millisecond * time.Duration(DELAY_OPEN))
 		}
 		os.Exit(0)
 	}
 	if CLEAR_NEW {
 		db.News().DeleteAll()
-		logger.WithField("component", "store").Info("Clear all news")
+		logger.WithField("component", "store").Info("Deleted opened news")
 		os.Exit(0)
 	}
 	collectChan := make(chan *model.Target)
 	conveyers := make(map[string]*conveyer.Conveyer)
 	for name, configConveyer := range config.GetConveyerConfig() {
 		conveyers[name], err = conveyer.New(name, configConveyer)
-		logger.WithFields(logrus.Fields{
-			"component": "conveyer:" + name,
-		}).Info("Create conveyer")
 		if err != nil {
 			logger.WithFields(logrus.Fields{
-				"package":  "conveyer",
-				"function": "LoadToml",
-				"args[1]":  name,
-				"args[2]":  configConveyer,
-			}).Warn(err)
+				"companent": "conveyer",
+				"function":  "New()",
+				"args[1]":   name,
+				"args[2]":   configConveyer,
+			}).Error(err)
 		}
 		conveyers[name].Start(&wg)
+		logger.WithField("companent", "conveyer:"+name).Info("Start work")
 	}
 	go Collector(db, collectChan)
 	for name, conv := range conveyers {
@@ -155,8 +154,10 @@ func main() {
 	}
 	wg.Wait()
 	elems, err := db.News().GetAll()
-	logger.WithField("component", "store").Infof("News:\n")
-	for _, v := range elems {
-		logger.WithField("component", "store").Infof("%s:\n", v.Url)
+	if len(elems) > 0 {
+		logger.WithField("component", "store").Infof("News:")
+		for _, v := range elems {
+			logger.WithField("component", "store").Infof("%s:", v.Url)
+		}
 	}
 }

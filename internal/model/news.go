@@ -1,5 +1,6 @@
 package model
 
 type News struct {
-	Url string
+	Url  string
+	Open bool
 }

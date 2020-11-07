@@ -3,8 +3,9 @@ build:
 #		go build -v -gcflags=all="-N -l" ./cmd/parser
 	go build -v ./cmd/parser
 
-windows:
-	CGO_ENABLED=1 GOOS=windows GOARCH=386 go build -v -o parser_cgo1.exe ./cmd/parser 
+release: build
+	sudo cp parser /usr/local/bin/parser
+	cp configs/config.toml /home/greed/.config/parser/config.toml
 
 run: build
 	./parser

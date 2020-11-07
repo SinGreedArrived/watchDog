@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS "targets" (
 );
 CREATE TABLE IF NOT EXISTS "news" (
 	"url"	TEXT UNIQUE,
+	"open"	bool,
 	PRIMARY KEY("url")
 );`
 
