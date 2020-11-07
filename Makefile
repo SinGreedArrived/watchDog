@@ -5,7 +5,7 @@ build:
 
 release: build
 	sudo cp parser /usr/local/bin/parser
-	cp configs/config.toml /home/greed/.config/parser/config.toml
+#	cp configs/config.toml /home/greed/.config/parser/config.toml
 
 run: build
 	./parser

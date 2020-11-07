@@ -46,12 +46,34 @@ func Collector(s *store.Store, collectChan chan *model.Target) {
 	for t := range collectChan {
 		elem, _ := s.Target().FindByUrl(t.Url)
 		if elem == nil {
-			s.Target().Create(t)
-			s.News().Create(&model.News{Url: t.Url, Open: false})
+			_, err := s.Target().Create(t)
+			if err != nil {
+				logger.Panic(err)
+			}
+			_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
+			if err != nil {
+				logger.Panic(err)
+			}
+			logger.WithFields(logrus.Fields{
+				"component": "store",
+				"table":     "news",
+			}).Infof("Create %s", t.Url)
+
 		} else {
 			if elem.Hash != t.Hash {
-				s.Target().Create(t)
-				s.News().Create(&model.News{Url: t.Url, Open: false})
+				_, err := s.Target().Create(t)
+				if err != nil {
+					logger.Panic(err)
+				}
+				_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
+				if err != nil {
+					logger.Panic(err)
+				}
+				logger.WithFields(logrus.Fields{
+					"component": "store",
+					"table":     "news",
+				}).Infof("Create %s", t.Url)
+				//	logger.WithField("component", "store").Infof("New elem: %s", t.Url)
 			} else {
 				continue
 			}
@@ -160,4 +182,5 @@ func main() {
 			logger.WithField("component", "store").Infof("%s:", v.Url)
 		}
 	}
+	logger.Info("Finish factory")
 }
