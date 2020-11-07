@@ -55,8 +55,8 @@ func Collector(s *store.Store, collectChan chan *model.Target) {
 				logger.Panic(err)
 			}
 			logger.WithFields(logrus.Fields{
-				"component": "store",
-				"table":     "news",
+				"component": "Store",
+				"table":     "News",
 			}).Infof("Create %s", t.Url)
 
 		} else {
@@ -70,8 +70,8 @@ func Collector(s *store.Store, collectChan chan *model.Target) {
 					logger.Panic(err)
 				}
 				logger.WithFields(logrus.Fields{
-					"component": "store",
-					"table":     "news",
+					"component": "Store",
+					"table":     "News",
 				}).Infof("Create %s", t.Url)
 				//	logger.WithField("component", "store").Infof("New elem: %s", t.Url)
 			} else {
@@ -106,7 +106,7 @@ func main() {
 	db := store.New(config.Store)
 	if err := db.Open(); err != nil {
 		logger.WithFields(logrus.Fields{
-			"package":  "store",
+			"package":  "Store",
 			"function": "Open",
 		}).Fatal(err)
 	}
@@ -135,14 +135,14 @@ func main() {
 		conveyers[name], err = conveyer.New(name, configConveyer)
 		if err != nil {
 			logger.WithFields(logrus.Fields{
-				"companent": "conveyer",
+				"companent": "Conveyer",
 				"function":  "New()",
 				"args[1]":   name,
 				"args[2]":   configConveyer,
 			}).Error(err)
 		}
 		conveyers[name].Start(&wg)
-		logger.WithField("companent", "conveyer:"+name).Info("Start work")
+		logger.WithField("companent", "Conveyer:"+name).Info("Start work")
 	}
 	go Collector(db, collectChan)
 	for name, conv := range conveyers {
@@ -150,7 +150,7 @@ func main() {
 		go func(conv *conveyer.Conveyer, list []string) {
 			count := 0
 			logger.WithFields(logrus.Fields{
-				"component": "conveyer:" + conv.GetName(),
+				"component": "Conveyer:" + conv.GetName(),
 				"status":    "Received",
 			}).Infof("%d links", len(TargetList))
 			for _, url := range list {
@@ -159,7 +159,7 @@ func main() {
 			}
 			conv.Close()
 			logger.WithFields(logrus.Fields{
-				"component": "conveyer:" + conv.GetName(),
+				"component": "Conveyer:" + conv.GetName(),
 				"status":    "Done",
 			}).Infof("%d links", count)
 		}(conv, TargetList)
@@ -177,9 +177,12 @@ func main() {
 	wg.Wait()
 	elems, err := db.News().GetAll()
 	if len(elems) > 0 {
-		logger.WithField("component", "store").Infof("News:")
+		logger.WithField("component", "Store").Infof("News:")
 		for _, v := range elems {
-			logger.WithField("component", "store").Infof("%s:", v.Url)
+			logger.WithFields(logrus.Fields{
+				"component": "Store",
+				"table":     "New",
+			}).Infof("%s", v.Url)
 		}
 	}
 	logger.Info("Finish factory")
