@@ -166,29 +166,26 @@ func (self *Conveyer) init(name string) error {
 	return nil
 }
 
-func (self *Conveyer) Start(wg *sync.WaitGroup) (chan<- []byte, <-chan []byte, <-chan error) {
-	wg.Add(1)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				self.err <- errors.New(fmt.Sprint(r))
-				go self.Start(wg)
-			}
-			wg.Done()
-		}()
-		for elem := range self.input {
-			self.WriteData(elem)
-			for _, step := range self.steps {
-				err := step(self)
-				if err != nil {
-					panic(err)
-				}
-			}
-			self.output <- self.GetData()
-			time.Sleep(time.Millisecond * time.Duration(self.config.Delay))
+func (self *Conveyer) Start(wg *sync.WaitGroup) {
+	defer func() {
+		if r := recover(); r != nil {
+			self.err <- errors.New(fmt.Sprint(r))
+			wg.Add(1)
+			go self.Start(wg)
 		}
+		wg.Done()
 	}()
-	return self.input, self.output, self.err
+	for elem := range self.input {
+		self.WriteData(elem)
+		for _, step := range self.steps {
+			err := step(self)
+			if err != nil {
+				panic(err)
+			}
+		}
+		self.output <- self.GetData()
+		time.Sleep(time.Millisecond * time.Duration(self.config.Delay))
+	}
 }
 
 func (self *Conveyer) GetData(number ...int) []byte {

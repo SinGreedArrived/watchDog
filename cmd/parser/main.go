@@ -140,7 +140,8 @@ func main() {
 				"args[2]":   configConveyer,
 			}).Error(err)
 		}
-		conveyers[name].Start(&wg)
+		wg.Add(1)
+		go conveyers[name].Start(&wg)
 	}
 	go Collector(db, collectChan)
 	for name, conv := range conveyers {
@@ -169,7 +170,7 @@ func main() {
 			logger.WithFields(logrus.Fields{
 				"component": "Conveyer:" + conv.GetName(),
 				"status":    "Done",
-			}).Infof("%d links", count)
+			}).Infof("Check %d links", count)
 		}(conv, TargetList)
 	}
 	wg.Wait()
