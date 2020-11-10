@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -15,47 +14,35 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/net/proxy"
 )
-
-func Panic(err error) {
-	if err != nil {
-		log.Panic(err)
-	}
-}
 
 type Conveyer struct {
 	name        string
 	input       chan []byte
 	output      chan []byte
+	err         chan error
 	data        [][]byte
 	pointer     int
 	httpClient  *http.Client
 	httpRequest *http.Request
 	steps       []func(*Conveyer) error
 	config      *Config
-	//	logger      *logrus.Logger
 }
 
 func (self *Conveyer) init(name string) error {
 	self.name = name
 	self.pointer = 0
+	self.data = make([][]byte, 0)
+	self.data = append(self.data, []byte(""))
 	self.input = make(chan []byte)
 	self.output = make(chan []byte)
+	self.err = make(chan error)
 	self.httpClient = &http.Client{}
 	httpTransport := &http.Transport{}
 	self.httpRequest, _ = http.NewRequest("", "", nil)
 	self.steps = make([]func(*Conveyer) error, 0)
 	self.httpRequest.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0")
-	/*
-		self.logger = logrus.New()
-		if level, err := logrus.ParseLevel(self.config.logLevel); err != nil {
-			self.logger.SetLevel(logrus.InfoLevel)
-		} else {
-			self.logger.SetLevel(level)
-		}
-	*/
 	if self.config.Proxy != "" {
 		dialer, err := proxy.SOCKS5("tcp", self.config.Proxy, nil, proxy.Direct)
 		if err != nil {
@@ -72,8 +59,6 @@ func (self *Conveyer) init(name string) error {
 		}
 	}
 	self.httpClient.Transport = httpTransport
-	self.data = make([][]byte, 0)
-	self.data = append(self.data, []byte(self.httpRequest.URL.String()))
 	for _, command := range self.config.Steps {
 		cmd := command
 		switch cmd[0] {
@@ -181,32 +166,29 @@ func (self *Conveyer) init(name string) error {
 	return nil
 }
 
-func (self *Conveyer) Start(wg *sync.WaitGroup) {
+func (self *Conveyer) Start(wg *sync.WaitGroup) (chan<- []byte, <-chan []byte, <-chan error) {
 	wg.Add(1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				self.err <- errors.New(fmt.Sprint(r))
+				go self.Start(wg)
+			}
+			wg.Done()
+		}()
 		for elem := range self.input {
 			self.WriteData(elem)
 			for _, step := range self.steps {
 				err := step(self)
 				if err != nil {
-					Panic(err)
+					panic(err)
 				}
 			}
 			self.output <- self.GetData()
 			time.Sleep(time.Millisecond * time.Duration(self.config.Delay))
 		}
-		defer func() {
-			if r := recover(); r != nil {
-				self.Start(wg)
-			}
-			close(self.output)
-			wg.Done()
-		}()
 	}()
-}
-
-func (self *Conveyer) SetOutput(output chan []byte) {
-	self.output = output
+	return self.input, self.output, self.err
 }
 
 func (self *Conveyer) GetData(number ...int) []byte {
@@ -245,21 +227,16 @@ func New(name string, cc *Config) (*Conveyer, error) {
 func (self *Conveyer) GetInput() chan []byte {
 	return self.input
 }
-
 func (self *Conveyer) GetOutput() chan []byte {
 	return self.output
+}
+func (self *Conveyer) GetError() chan error {
+	return self.err
 }
 
 func (self *Conveyer) GetName() string {
 	return self.name
 }
-
-/*
-func (self *Conveyer) SetLogger(logger *logrus.Logger) {
-	self.logger = logger
-}
-*/
-
 func (self *Conveyer) Close() {
 	close(self.input)
 }

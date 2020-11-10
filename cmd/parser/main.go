@@ -73,7 +73,6 @@ func Collector(s *store.Store, collectChan chan *model.Target) {
 					"component": "Store",
 					"table":     "News",
 				}).Infof("Create %s", t.Url)
-				//	logger.WithField("component", "store").Infof("New elem: %s", t.Url)
 			} else {
 				continue
 			}
@@ -142,12 +141,12 @@ func main() {
 			}).Error(err)
 		}
 		conveyers[name].Start(&wg)
-		logger.WithField("companent", "Conveyer:"+name).Info("Start work")
 	}
 	go Collector(db, collectChan)
 	for name, conv := range conveyers {
 		TargetList := config.GetTargetList(name)
 		go func(conv *conveyer.Conveyer, list []string) {
+			defer conv.Close()
 			count := 0
 			logger.WithFields(logrus.Fields{
 				"component": "Conveyer:" + conv.GetName(),
@@ -156,34 +155,35 @@ func main() {
 			for _, url := range list {
 				conv.GetInput() <- []byte(url)
 				count++
+				select {
+				case data := <-conv.GetOutput():
+					strData := hex.EncodeToString(data)
+					collectChan <- &model.Target{
+						Url:  url,
+						Hash: strData,
+					}
+				case msgErr := <-conv.GetError():
+					logger.WithField("component", "conveyer:"+conv.GetName()).Error(msgErr)
+				}
 			}
-			conv.Close()
 			logger.WithFields(logrus.Fields{
 				"component": "Conveyer:" + conv.GetName(),
 				"status":    "Done",
 			}).Infof("%d links", count)
 		}(conv, TargetList)
-		go func(conv *conveyer.Conveyer, list []string) {
-			for _, url := range list {
-				hash := <-conv.GetOutput()
-				strHash := hex.EncodeToString(hash)
-				collectChan <- &model.Target{
-					Url:  url,
-					Hash: strHash,
-				}
-			}
-		}(conv, TargetList)
 	}
 	wg.Wait()
-	elems, err := db.News().GetAll()
-	if len(elems) > 0 {
-		logger.WithField("component", "Store").Infof("News:")
-		for _, v := range elems {
-			logger.WithFields(logrus.Fields{
-				"component": "Store",
-				"table":     "New",
-			}).Infof("%s", v.Url)
+	/*
+		elems, err := db.News().GetAll()
+		if len(elems) > 0 {
+			logger.WithField("component", "Store").Infof("News:")
+			for _, v := range elems {
+				logger.WithFields(logrus.Fields{
+					"component": "Store",
+					"table":     "New",
+				}).Infof("%s", v.Url)
+			}
 		}
-	}
+	*/
 	logger.Info("Finish factory")
 }
