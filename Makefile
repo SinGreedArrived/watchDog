@@ -1,5 +1,5 @@
 .PHONY: build
-build:
+build: test
 #		go build -v -gcflags=all="-N -l" ./cmd/parser
 	go build -v ./cmd/parser
 
@@ -12,6 +12,6 @@ run: build
 
 .PHONY: test
 test:
-	go test -v -timeout 20s ./...
+	go test -v -timeout 10s ./...
 
 .DEFAULT_GOAL := build
