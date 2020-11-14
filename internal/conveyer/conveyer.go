@@ -23,6 +23,7 @@ type Conveyer struct {
 	output      chan []byte
 	err         chan error
 	data        [][]byte
+	stack       [][]byte
 	pointer     int
 	httpClient  *http.Client
 	httpRequest *http.Request
@@ -35,6 +36,8 @@ func (self *Conveyer) init(name string) error {
 	self.pointer = 0
 	self.data = make([][]byte, 0)
 	self.data = append(self.data, []byte(""))
+	self.stack = make([][]byte, 0)
+	self.stack = append(self.data, []byte(""))
 	self.input = make(chan []byte)
 	self.output = make(chan []byte)
 	self.err = make(chan error)
