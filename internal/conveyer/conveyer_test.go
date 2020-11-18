@@ -1,6 +1,7 @@
 package conveyer
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -12,7 +13,7 @@ func TestConveyer_google(t *testing.T) {
 	test, err := New("ifconfig.co", nil)
 	assert.Nil(t, err)
 	assert.NotNil(t, test)
-	go test.Start(&wg)
+	go test.Start(context.Background(), &wg)
 	test.GetInput() <- []byte("https://ifconfig.co/country")
 	result := string(<-test.GetOutput())
 	assert.Equal(t, result, "Russia\n")

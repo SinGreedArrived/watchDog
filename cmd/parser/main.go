@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
-	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"projects/parser/internal/configure"
 	"projects/parser/internal/conveyer"
 	"projects/parser/internal/model"
@@ -41,25 +42,12 @@ func init() {
 	})
 }
 
-func Collector(s *store.Store, collectChan chan *model.Target) {
-	for t := range collectChan {
-		elem, _ := s.Target().FindByUrl(t.Url)
-		if elem == nil {
-			_, err := s.Target().Create(t)
-			if err != nil {
-				logger.Panic(err)
-			}
-			_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
-			if err != nil {
-				logger.Panic(err)
-			}
-			logger.WithFields(logrus.Fields{
-				"component": "Store",
-				"table":     "News",
-			}).Infof("Create %s", t.Url)
-
-		} else {
-			if elem.Hash != t.Hash {
+func Collector(ctx context.Context, s *store.Store, collectChan chan *model.Target) {
+	for {
+		select {
+		case t := <-collectChan:
+			elem, _ := s.Target().FindByUrl(t.Url)
+			if elem == nil {
 				_, err := s.Target().Create(t)
 				if err != nil {
 					logger.Panic(err)
@@ -72,9 +60,27 @@ func Collector(s *store.Store, collectChan chan *model.Target) {
 					"component": "Store",
 					"table":     "News",
 				}).Infof("Create %s", t.Url)
+
 			} else {
-				continue
+				if elem.Hash != t.Hash {
+					_, err := s.Target().Create(t)
+					if err != nil {
+						logger.Panic(err)
+					}
+					_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
+					if err != nil {
+						logger.Panic(err)
+					}
+					logger.WithFields(logrus.Fields{
+						"component": "Store",
+						"table":     "News",
+					}).Infof("Create %s", t.Url)
+				} else {
+					continue
+				}
 			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -83,7 +89,21 @@ func OpenLink(url string) {
 	cmd := exec.Command(BROWSER, url)
 	if err := cmd.Start(); err != nil {
 		if err != nil {
-			log.Println(err)
+			logger.Error(err)
+		}
+	}
+}
+
+func handleSignals(cancel context.CancelFunc) {
+	sigCh := make(chan os.Signal)
+	signal.Notify(sigCh, os.Interrupt)
+	for {
+		sig := <-sigCh
+		switch sig {
+		case os.Interrupt:
+			logger.Error("Signal Interrupt!")
+			cancel()
+			return
 		}
 	}
 }
@@ -91,6 +111,8 @@ func OpenLink(url string) {
 func main() {
 	logger.Info("Start factory...")
 	flag.Parse()
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	go handleSignals(cancelFunc)
 	config := configure.NewConfig()
 	err := config.LoadToml(CONFIG_PATH)
 	if err != nil {
@@ -138,14 +160,21 @@ func main() {
 			}).Error(err)
 		}
 		wg.Add(1)
-		go conveyers[name].Start(&wg)
+		go conveyers[name].Start(ctx, &wg)
 	}
-	go Collector(db, collectChan)
+	go Collector(ctx, db, collectChan)
 	for name, conv := range conveyers {
 		TargetList := config.GetTargetList(name)
-		go func(conv *conveyer.Conveyer, list []string) {
-			defer conv.Close()
+
+		go func(ctx context.Context, conv *conveyer.Conveyer, list []string) {
 			count := 0
+			defer func() {
+				logger.WithFields(logrus.Fields{
+					"component": "Conveyer:" + conv.GetName(),
+					"status":    "Done",
+				}).Infof("Check %d links", count)
+				conv.Close()
+			}()
 			logger.WithFields(logrus.Fields{
 				"component": "Conveyer:" + conv.GetName(),
 				"status":    "Received",
@@ -162,26 +191,14 @@ func main() {
 					}
 				case msgErr := <-conv.GetError():
 					logger.WithField("component", "conveyer:"+conv.GetName()).Error(msgErr)
+				case <-ctx.Done():
+					return
 				}
 			}
-			logger.WithFields(logrus.Fields{
-				"component": "Conveyer:" + conv.GetName(),
-				"status":    "Done",
-			}).Infof("Check %d links", count)
-		}(conv, TargetList)
+		}(ctx, conv, TargetList)
+
 	}
+	logger.Info("Wait all conveyer")
 	wg.Wait()
-	/*
-		elems, err := db.News().GetAll()
-		if len(elems) > 0 {
-			logger.WithField("component", "Store").Infof("News:")
-			for _, v := range elems {
-				logger.WithFields(logrus.Fields{
-					"component": "Store",
-					"table":     "New",
-				}).Infof("%s", v.Url)
-			}
-		}
-	*/
 	logger.Info("Finish factory")
 }
