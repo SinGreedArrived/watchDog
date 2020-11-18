@@ -1,4 +1,3 @@
-.PHONY: build
 build: test
 #		go build -v -gcflags=all="-N -l" ./cmd/parser
 	go build -v ./cmd/parser
@@ -10,8 +9,8 @@ release: build
 run: build
 	./parser
 
-.PHONY: test
 test:
 	go test -v -timeout 10s ./...
 
 .DEFAULT_GOAL := build
+.PHONY: test build release run
