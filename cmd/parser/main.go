@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -101,6 +102,7 @@ func handleSignals(cancel context.CancelFunc) {
 		sig := <-sigCh
 		switch sig {
 		case os.Interrupt:
+			fmt.Print("\r")
 			logger.Error("Signal Interrupt!")
 			cancel()
 			return
