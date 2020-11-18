@@ -37,7 +37,6 @@ func init() {
 	logger.SetLevel(logrus.InfoLevel)
 	logger.SetFormatter(&nested.Formatter{
 		TimestampFormat: "2006-01-02 15:04:05",
-		FieldsOrder:     []string{"component", "name"},
 		HideKeys:        true,
 	})
 }
@@ -134,10 +133,8 @@ func main() {
 		conveyers[name], err = conveyer.New(name, configConveyer)
 		if err != nil {
 			logger.WithFields(logrus.Fields{
-				"companent": "Conveyer",
+				"companent": "Conveyer" + name,
 				"function":  "New()",
-				"args[1]":   name,
-				"args[2]":   configConveyer,
 			}).Error(err)
 		}
 		wg.Add(1)
