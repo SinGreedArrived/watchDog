@@ -22,7 +22,6 @@ func NewConfig() *config {
 }
 
 func (self *config) LoadToml(filename string) error {
-	//	log.Println("Load Toml file")
 	f, err := os.Open(filename)
 	if err != nil {
 		return err

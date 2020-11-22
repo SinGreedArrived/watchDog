@@ -20,21 +20,22 @@ import (
 )
 
 var (
-	CONFIG_PATH string
-	BROWSER     string
-	OPEN_NEW    bool
-	CLEAR_NEW   bool
-	DELAY_OPEN  int
+	configPath  string
+	browserName string
+	openNew     bool
+	clearNew    bool
+	delayOpen   int
 	logger      *logrus.Logger
 	wg          sync.WaitGroup
 )
 
 func init() {
-	flag.StringVar(&CONFIG_PATH, "config", "configs/config.toml", "path to config file")
-	flag.StringVar(&BROWSER, "browser", "firefox", "browser for open link")
-	flag.BoolVar(&OPEN_NEW, "open", false, "browser for open link")
-	flag.BoolVar(&CLEAR_NEW, "clear", false, "clear news")
-	flag.IntVar(&DELAY_OPEN, "delay", 1500, "delay for open link")
+	dirName, _ := os.Getwd()
+	flag.StringVar(&configPath, "config", dirName+"/configs/config.toml", "path to config file")
+	flag.StringVar(&browserName, "browser", "firefox", "browser for open link")
+	flag.BoolVar(&openNew, "open", false, "browser for open link")
+	flag.BoolVar(&clearNew, "clear", false, "clear news")
+	flag.IntVar(&delayOpen, "delay", 1500, "delay for open link")
 	logger = logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
 	logger.SetFormatter(&nested.Formatter{
@@ -43,7 +44,7 @@ func init() {
 	})
 }
 
-func Collector(ctx context.Context, s *store.Store, collectChan chan *model.Target) {
+func collector(ctx context.Context, s *store.Store, collectChan chan *model.Target) {
 	for {
 		select {
 		case t := <-collectChan:
@@ -86,8 +87,8 @@ func Collector(ctx context.Context, s *store.Store, collectChan chan *model.Targ
 	}
 }
 
-func OpenLink(url string) {
-	cmd := exec.Command(BROWSER, url)
+func openLink(url string) {
+	cmd := exec.Command(browserName, url)
 	if err := cmd.Start(); err != nil {
 		if err != nil {
 			logger.Error(err)
@@ -116,15 +117,14 @@ func main() {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	go handleSignals(cancelFunc)
 	config := configure.NewConfig()
-	err := config.LoadToml(CONFIG_PATH)
+	err := config.LoadToml(configPath)
 	if err != nil {
 		logger.WithFields(logrus.Fields{
 			"package":  "configure",
 			"function": "LoadToml",
-			"argument": CONFIG_PATH,
 		}).Fatal(err)
 	}
-	logger.WithField("component", "config").Info("Loaded configure from " + CONFIG_PATH)
+	logger.WithField("component", "config").Info("Loaded configure from " + configPath)
 	db := store.New(config.Store)
 	if err := db.Open(); err != nil {
 		logger.WithFields(logrus.Fields{
@@ -134,19 +134,19 @@ func main() {
 	}
 	defer db.Close()
 	logger.WithField("component", "store").Info("Opened store from " + config.Store.DBpath)
-	if OPEN_NEW {
+	if openNew {
 		urls, _ := db.News().GetAll()
 		if len(urls) == 0 {
 			logger.WithField("component", "store").Info("I don't have news")
 		}
 		for _, url := range urls {
-			OpenLink(url.Url)
+			openLink(url.Url)
 			db.News().CheckOpened(url.Url)
-			time.Sleep(time.Millisecond * time.Duration(DELAY_OPEN))
+			time.Sleep(time.Millisecond * time.Duration(delayOpen))
 		}
 		os.Exit(0)
 	}
-	if CLEAR_NEW {
+	if clearNew {
 		db.News().DeleteAll()
 		logger.WithField("component", "store").Info("Deleted opened news")
 		os.Exit(0)
@@ -164,7 +164,7 @@ func main() {
 		wg.Add(1)
 		go conveyers[name].Start(ctx, &wg)
 	}
-	go Collector(ctx, db, collectChan)
+	go collector(ctx, db, collectChan)
 	for name, conv := range conveyers {
 		TargetList := config.GetTargetList(name)
 
