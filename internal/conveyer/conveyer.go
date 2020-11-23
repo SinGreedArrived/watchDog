@@ -165,7 +165,8 @@ func (self *Conveyer) GetName() string {
 	return self.name
 }
 
-// Close conveyer
-func (self *Conveyer) Close() {
+// Close() close conveyer
+func (self *Conveyer) Close() error {
 	close(self.input)
+	return nil
 }
