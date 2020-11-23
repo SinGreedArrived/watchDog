@@ -24,6 +24,7 @@ var (
 	browserName string
 	openNew     bool
 	clearNew    bool
+	notify      bool
 	delayOpen   int
 	logger      *logrus.Logger
 	wg          sync.WaitGroup
@@ -34,6 +35,7 @@ func init() {
 	flag.StringVar(&configPath, "config", dirName+"/configs/config.toml", "path to config file")
 	flag.StringVar(&browserName, "browser", "firefox", "browser for open link")
 	flag.BoolVar(&openNew, "open", false, "browser for open link")
+	flag.BoolVar(&notify, "notify", false, "Notify for news")
 	flag.BoolVar(&clearNew, "clear", false, "clear news")
 	flag.IntVar(&delayOpen, "delay", 1500, "delay for open link")
 	logger = logrus.New()
@@ -62,7 +64,9 @@ func collector(ctx context.Context, s *store.Store, collectChan chan *model.Targ
 					"component": "Store",
 					"table":     "News",
 				}).Infof("Create %s", t.Url)
-
+				if notify {
+					notifySend("New!", t.Url)
+				}
 			} else {
 				if elem.Hash != t.Hash {
 					_, err := s.Target().Create(t)
@@ -77,6 +81,9 @@ func collector(ctx context.Context, s *store.Store, collectChan chan *model.Targ
 						"component": "Store",
 						"table":     "News",
 					}).Infof("Create %s", t.Url)
+				if notify {
+					notifySend("New!", t.Url)
+				}
 				} else {
 					continue
 				}
@@ -89,6 +96,15 @@ func collector(ctx context.Context, s *store.Store, collectChan chan *model.Targ
 
 func openLink(url string) {
 	cmd := exec.Command(browserName, url)
+	if err := cmd.Start(); err != nil {
+		if err != nil {
+			logger.Error(err)
+		}
+	}
+}
+
+func notifySend(title string,message string) {
+	cmd := exec.Command("notify-send", title, message)
 	if err := cmd.Start(); err != nil {
 		if err != nil {
 			logger.Error(err)
