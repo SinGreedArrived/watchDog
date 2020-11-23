@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package api;
+
+service Factory {
+	rpc Do(Request) returns (Response) {};
+	rpc CreateConveyer(Request) returns (Response) {};
+}
+
+message Request {
+	string name = 1;
+	bytes url = 2;
+}
+
+message Response {
+	string result = 1;
+}
+
