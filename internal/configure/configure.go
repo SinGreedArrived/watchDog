@@ -6,7 +6,7 @@ import (
 	"projects/parser/internal/conveyer"
 	"projects/parser/internal/store"
 
-	"github.com/BurntSushi/toml"
+	"github.com/pelletier/go-toml"
 )
 
 type config struct {
@@ -31,10 +31,18 @@ func (self *config) LoadToml(filename string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := toml.Decode(string(data), self); err != nil {
+	if err := toml.Unmarshal(data, self); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (self *config) GetConv(name string) ([]byte,error) {
+	data,err := toml.Marshal(self.Conveyer[name])
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (self *config) GetConveyerConfig() map[string]*conveyer.Config {

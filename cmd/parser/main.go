@@ -46,87 +46,6 @@ func init() {
 	})
 }
 
-func collector(ctx context.Context, s *store.Store, collectChan chan *model.Target) {
-	for {
-		select {
-		case t := <-collectChan:
-			elem, _ := s.Target().FindByUrl(t.Url)
-			if elem == nil {
-				_, err := s.Target().Create(t)
-				if err != nil {
-					logger.Panic(err)
-				}
-				_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
-				if err != nil {
-					logger.Panic(err)
-				}
-				logger.WithFields(logrus.Fields{
-					"component": "Store",
-					"table":     "News",
-				}).Infof("Create %s", t.Url)
-				if notify {
-					notifySend("New!", t.Url)
-				}
-			} else {
-				if elem.Hash != t.Hash {
-					_, err := s.Target().Create(t)
-					if err != nil {
-						logger.Panic(err)
-					}
-					_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
-					if err != nil {
-						logger.Panic(err)
-					}
-					logger.WithFields(logrus.Fields{
-						"component": "Store",
-						"table":     "News",
-					}).Infof("Create %s", t.Url)
-				if notify {
-					notifySend("New!", t.Url)
-				}
-				} else {
-					continue
-				}
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func openLink(url string) {
-	cmd := exec.Command(browserName, url)
-	if err := cmd.Start(); err != nil {
-		if err != nil {
-			logger.Error(err)
-		}
-	}
-}
-
-func notifySend(title string,message string) {
-	cmd := exec.Command("notify-send", title, message)
-	if err := cmd.Start(); err != nil {
-		if err != nil {
-			logger.Error(err)
-		}
-	}
-}
-
-func handleSignals(cancel context.CancelFunc) {
-	sigCh := make(chan os.Signal)
-	signal.Notify(sigCh, os.Interrupt)
-	for {
-		sig := <-sigCh
-		switch sig {
-		case os.Interrupt:
-			fmt.Print("\r")
-			logger.Error("Signal Interrupt!")
-			cancel()
-			return
-		}
-	}
-}
-
 func main() {
 	logger.Info("Start factory...")
 	flag.Parse()
@@ -220,3 +139,85 @@ func main() {
 	wg.Wait()
 	logger.Info("Finish factory")
 }
+
+func collector(ctx context.Context, s *store.Store, collectChan chan *model.Target) {
+	for {
+		select {
+		case t := <-collectChan:
+			elem, _ := s.Target().FindByUrl(t.Url)
+			if elem == nil {
+				_, err := s.Target().Create(t)
+				if err != nil {
+					logger.Panic(err)
+				}
+				_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
+				if err != nil {
+					logger.Panic(err)
+				}
+				logger.WithFields(logrus.Fields{
+					"component": "Store",
+					"table":     "News",
+				}).Infof("Create %s", t.Url)
+				if notify {
+					notifySend("New!", t.Url)
+				}
+			} else {
+				if elem.Hash != t.Hash {
+					_, err := s.Target().Create(t)
+					if err != nil {
+						logger.Panic(err)
+					}
+					_, err = s.News().Create(&model.News{Url: t.Url, Open: false})
+					if err != nil {
+						logger.Panic(err)
+					}
+					logger.WithFields(logrus.Fields{
+						"component": "Store",
+						"table":     "News",
+					}).Infof("Create %s", t.Url)
+				if notify {
+					notifySend("New!", t.Url)
+				}
+				} else {
+					continue
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func openLink(url string) {
+	cmd := exec.Command(browserName, url)
+	if err := cmd.Start(); err != nil {
+		if err != nil {
+			logger.Error(err)
+		}
+	}
+}
+
+func notifySend(title string,message string) {
+	cmd := exec.Command("notify-send", title, message)
+	if err := cmd.Start(); err != nil {
+		if err != nil {
+			logger.Error(err)
+		}
+	}
+}
+
+func handleSignals(cancel context.CancelFunc) {
+	sigCh := make(chan os.Signal)
+	signal.Notify(sigCh, os.Interrupt)
+	for {
+		sig := <-sigCh
+		switch sig {
+		case os.Interrupt:
+			fmt.Print("\r")
+			logger.Error("Signal Interrupt!")
+			cancel()
+			return
+		}
+	}
+}
+
