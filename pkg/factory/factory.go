@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"projects/parser/internal/conveyer"
+	"projects/parser/pkg/conveyer"
 	"projects/parser/pkg/api"
 	"sync"
 
