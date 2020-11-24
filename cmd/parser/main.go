@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"projects/parser/internal/configure"
-	"projects/parser/internal/conveyer"
+	"projects/parser/pkg/conveyer"
 	"projects/parser/internal/model"
 	"projects/parser/internal/store"
 	"sync"
@@ -138,6 +138,7 @@ func main() {
 	logger.Info("Wait all conveyer")
 	wg.Wait()
 	logger.Info("Finish factory")
+	notifySend("Factory", "Finish!")
 }
 
 func collector(ctx context.Context, s *store.Store, collectChan chan *model.Target) {

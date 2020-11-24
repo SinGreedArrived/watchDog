@@ -3,7 +3,7 @@ package configure
 import (
 	"io/ioutil"
 	"os"
-	"projects/parser/internal/conveyer"
+	"projects/parser/pkg/conveyer"
 	"projects/parser/internal/store"
 
 	"github.com/pelletier/go-toml"
