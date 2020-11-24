@@ -138,6 +138,7 @@ func main() {
 	logger.Info("Wait all conveyer")
 	wg.Wait()
 	logger.Info("Finish factory")
+	notifySend("Factory", "Finish!")
 }
 
 func collector(ctx context.Context, s *store.Store, collectChan chan *model.Target) {
