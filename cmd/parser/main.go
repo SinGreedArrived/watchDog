@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"projects/parser/internal/configure"
-	"projects/parser/internal/conveyer"
+	"projects/parser/pkg/conveyer"
 	"projects/parser/internal/model"
 	"projects/parser/internal/store"
 	"sync"
